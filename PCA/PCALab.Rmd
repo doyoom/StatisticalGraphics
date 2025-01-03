@@ -1,0 +1,64 @@
+---
+title: "DoyoonKIm"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-11-13"
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+if (!require("ggfortify")) install.packages("ggfortify")
+library(ggfortify)  # For using autoplot with PCA
+# Load data
+data(trees)
+
+# Add a factor column for volume class
+trees$vol_fac <- factor(ifelse(trees$Volume > 25, "large", "small"))
+trees$height_miles <- trees$Height / 5280
+ggplot(trees, aes(x = Girth, y = height_miles, color = vol_fac, size = Volume)) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "Scatter Plot of the Original Tree Data",
+    x = "Girth (inches)",
+    y = "Height (miles)",
+    color = "Volume class",
+    size = "Volume"
+  ) +
+  theme_minimal()
+# Create matrix and standardize
+tree_mx <- cbind("height_miles" = trees$height_miles, "girth" = trees$Girth)
+trees_scaled <- scale(tree_mx)
+
+# Perform PCA on standardized data
+tree_pca_scaled <- prcomp(tree_mx, center = TRUE, scale. = TRUE)
+summary(tree_pca_scaled)
+# Prepare segments for PC1 and PC2
+pc1 <- tree_pca_scaled$rotation[, 1]
+pc2 <- tree_pca_scaled$rotation[, 2]
+
+segments_df <- data.frame(
+  x1 = c(0, 0), y1 = c(0, 0),
+  x2 = c(pc1[1] * 2, pc2[1] * 2),  
+  y2 = c(pc1[2] * 2, pc2[2] * 2),  
+  segment = c("PC1", "PC2")
+)
+
+# Plot with PCA components
+ggplot(as.data.frame(trees_scaled), aes(x = girth, y = height_miles)) +
+  geom_point(aes(size = trees$Volume, color = trees$vol_fac), alpha = 0.6) +
+  geom_segment(data = segments_df, aes(x = x1, y = y1, xend = x2, yend = y2),
+               arrow = arrow(length = unit(0.2, "cm")), color = "black") +
+  geom_text(data = segments_df, aes(x = x2, y = y2, label = segment), vjust = -0.5, hjust = -0.5, color = "black") +
+  labs(
+    x = "Girth (standardized)", y = "Height (standardized)",
+    color = "Volume class", size = "Volume",
+    title = "PCA Overlay on Standardized Tree Data"
+  ) +
+  theme_minimal()
+autoplot(tree_pca_scaled, data = trees, colour = "vol_fac",
+         loadings = TRUE, loadings.label = TRUE, loadings.label.size = 3) +
+  labs(title = "PCA of Standardized Tree Data")
