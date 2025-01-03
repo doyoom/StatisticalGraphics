@@ -1,0 +1,231 @@
+---
+title: "Homework 3"
+author: "Doyoon Kim <br> <br> Department of Data Science <br>  School of Artificial Intelligence <br> Ewha Womans University"
+date: "Due by: Monday, November 27, 2024, at 11:59 PM"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Make-Up Opportunities!
+
+* Extra 3 points toward the Midterm Exam grade will be given to those who share their **well-written solution** for Problem 2 on the bulletin board by November 25.
+* Extra 3 points toward the Homework grade will be given to those who share their **well-written solution** for Problem 3 on the bulletin board by November 25.
+* Extra 1 point toward the Homework: Post five helpful comments on the bulletin board regarding the above posts. Among these four comments, two must be related to Q&A about methods and interpretation, while the remaining three can be compliments. This is due by December 2. 
+
+
+Submit your Rmarkdown file (.Rmd), html, and pdf file on the bulletin board.
+
+# Logistics
+
+* Students are encouraged to collaborate and discuss course problems with peers, instructors, or AI tools to enhance their understanding.
+* However, when writing up their solutions and programming codes, students are required to do this on their own, **without copying or plagiarizing from another source**.
+* All solutions and code must be the student's own work.
+* Copying or plagiarizing from any source, including other students or AI generated content, is strictly prohibited and will result in a score of zero for that assignment or exam.
+* After implementing your code, **you must present both the code and the corresponding results**. Ensure that all R code is enclosed within an R code chunk. The results should directly address the requirements of the question. Failure to do so will result in a score of 0.
+* **Submissions that are not properly compiled or are in an incorrect format will receive a score of 0 for the entire homework.**
+
+
+# Problem 1: Penalized Regression (20 points)
+
+```{r message=FALSE, warning=FALSE}
+library(data.table)
+library(ggplot2)
+library(ISLR2)
+library(glmnet)
+data(Hitters)
+# remove rows with NA's
+Hitters <- Hitters[complete.cases(Hitters),]
+head(Hitters)
+## create an x matrix and y vector from the Hitters data.frame
+## this is needed for input to glmnet
+x <- model.matrix(Salary ~ ., Hitters)[, -1]
+y <- Hitters$Salary
+```
+
+
+## Problem 1-1 (2 point)
+
+`glmnet` solves the problem
+
+$$\displaystyle\mathrm{Penalty}(\beta)=(1-\alpha)\sum_{j = 1}^p \beta_j^2/2 + \alpha\sum_{j = 1}^p |\beta_j|$$
+
+How should we set $\alpha$ to implement **lasso regression**? (Don't worry about division by 2 in this course)
+
+### Solution
+```{r, warning=F, message=F}
+library(glmnet)
+lasso_model <- glmnet(x, y, alpha = 1)
+print(lasso_model)
+plot(lasso_model, xvar = "lambda", label = TRUE)
+```
+
+## Problem 1-2 (3 points)
+
+First, create a grid of $\lambda$ values by generating a sequence of equal spaced 100 values of $log_{10}(\lambda)$, ranging from $6$ to $-2$ (remember that $x = log_{10}(y)$ is equivalent to $y= 10^x$).  With the help of the `glmnet` package, fit **lasso regression** models with a range of lambda values. In `lasso_coef`, what does the rows, columns, and each cell element represent? 
+
+### Solution
+```{r, warning=F, message=F}
+lambda_log_grid <- seq(6, -2, length.out = 100)
+lambda_grid <- 10^lambda_log_grid
+lambda_grid[1:5]
+lasso_model <- glmnet(x, y, alpha = 1, lambda = lambda_grid)
+lasso_coef <- coef(lasso_model)
+lasso_coef
+```
+
+
+## Problem 1-3 (7 points)
+
+1. For each value of $\lambda$ used in the lasso regression, determine how many coefficients are exactly equal to zero. Create a line plot (including data points) where the x-axis represents $log(\lambda)$ and the y-axis represents the number of zero coefficients across the range of $\lambda$. Please replicate the plot shown below.
+
+```{r, warning=F, message=F}
+num_zero_coefs <- apply(lasso_coef, 2, function(coefs) sum(coefs == 0))
+lambda_df <- data.frame(
+  log_lambda = log(lambda_grid),
+  zero_coefs = num_zero_coefs
+)
+library(ggplot2)
+ggplot(lambda_df, aes(x = log_lambda, y = zero_coefs)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Number of Zero Coefficients vs Log(Lambda)",
+    x = "log(Lambda)",
+    y = "Number of Zero Coefficients"
+  ) +
+  theme_minimal()
+```
+
+
+2. In the context of lasso regression, was there ever an instance where the coefficients were exactly equal to zero? Discuss the reasoning behind your answer, especially in comparison to lasso regression.
+
+### Solution
+
+Yes, in lasso regression, some coefficients do become exactly zero, especially as the λ value increases. This happens because lasso uses a penalty term that encourages the model to shrink some coefficients to zero. When the 
+λ value is large enough, the penalty is strong enough to force certain coefficients to be zero. This is actually one of the key features of lasso regression—it helps in feature selection by removing unnecessary variables from the model. The larger the λ, the more coefficients will be zero. In extreme cases, when λ is very large, it can shrink all the coefficients to zero, making the model essentially useless (as it would just predict the mean). So, the zero coefficients are a direct result of the regularization applied by lasso.
+
+## Problem 1-4 (8 points)
+
+We split the data into a training set and a test set as the below code shows. 
+
+1. Fit lasso and ridge regression on the training set, respectively.
+
+```{r, warning=F, message=F}
+library(glmnet)
+set.seed(123)
+train_indices <- sample(1:nrow(x), size = floor(0.7 * nrow(x)))
+x_train <- x[train_indices, ]
+y_train <- y[train_indices]
+x_test <- x[-train_indices, ]
+y_test <- y[-train_indices]
+lasso_model <- glmnet(x_train, y_train, alpha = 1, lambda = lambda_grid)
+ridge_model <- glmnet(x_train, y_train, alpha = 0, lambda = lambda_grid)
+lasso_coef <- coef(lasso_model)
+ridge_coef <- coef(ridge_model)
+lasso_pred <- predict(lasso_model, s = lambda_grid, newx = x_test)
+ridge_pred <- predict(ridge_model, s = lambda_grid, newx = x_test)
+lasso_mse <- mean((y_test - lasso_pred)^2)
+ridge_mse <- mean((y_test - ridge_pred)^2)
+lasso_coef
+ridge_coef
+lasso_mse
+ridge_mse
+```
+
+2. For each $\lambda$, calculate mean squared error (MSE) on the test dataset. Consider using the `sapply()` function for this task.
+
+```{r, warning=F, message=F}
+lasso_mse <- sapply(1:length(lambda_grid), function(i) {
+  pred <- predict(lasso_model, s = lambda_grid[i], newx = x_test)
+  mean((y_test - pred)^2)
+})
+ridge_mse <- sapply(1:length(lambda_grid), function(i) {
+  pred <- predict(ridge_model, s = lambda_grid[i], newx = x_test)
+  mean((y_test - pred)^2)
+})
+lasso_mse[1:5]  
+ridge_mse[1:5]  
+```
+
+3. Which value of $\lambda$ gives lower MSE for each lasso and ridge regression? Consider using the `apply()` function for this task.
+
+```{r, warning=F, message=F}
+min_lasso_index <- which.min(lasso_mse)
+min_lasso_lambda <- lambda_grid[min_lasso_index]
+min_lasso_mse <- lasso_mse[min_lasso_index]
+min_ridge_index <- which.min(ridge_mse)
+min_ridge_lambda <- lambda_grid[min_ridge_index]
+min_ridge_mse <- ridge_mse[min_ridge_index]
+min_lasso_lambda  
+min_lasso_mse    
+min_ridge_lambda  
+min_ridge_mse 
+```
+
+4. Determine which model exhibits a smaller MSE at the $\lambda$ value that corresponds to the lowest MSE.
+
+```{r, warning=F, message=F}
+if (min_lasso_mse < min_ridge_mse) {
+  cat("라쏘 회귀가 더 낮은 MSE를 보입니다.\n")
+} else {
+  cat("릿지 회귀가 더 낮은 MSE를 보입니다.\n")
+}
+```
+
+$$\mathrm{MSE} = \frac{1}{n} \sum_{i=1}^{n}(Y_{i}-\hat{Y}_{i})^2$$
+
+
+
+# Extra Credit: Problem 2
+
+Here are some sources where you can find publicly available datasets:
+
+* [Korean Government Open Data](https://www.data.go.kr/tcs/dss/selectDataSetList.do)
+* [HealthData.gov](https://healthdata.gov/browse?q=hiv&sortBy=relevance) (e.g. HIV)
+  * [HRSA Maternal and Child Health Bureau Data](https://data.hrsa.gov/data/download?data=MCHB#MCHB)
+* [U.S. Census Data](https://data.census.gov/all?q=United%20States&g=010XX00US)
+* etc.
+
+1. Describe in detail where and how you downloaded your data.
+
+2. Apply methods covered in the lecture (such as splines, penalized regression, or PCA) to analyze your data. Provide your code, explain each procedure, and **interpret** the result.
+
+3. Visualize your findings using `ggplot2`. Provide your code, explain each procedure, and **interpret** the result.
+
+4. Create an additional visualization using `Flourish`. Provide a screenshot of your visualization, explain your findings, and provide link to the Flourish plot.
+
+5. Share your overall thoughts, feelings, and reflections on what you’ve learned, appreciated, and areas where you see potential for personal improvement while working on Problem 2. 
+
+## Solution
+
+
+# Extra Credit: Problem 3 (Open Problem)
+
+Make your own question! 
+
+Below are some examples of how you can approach this question:
+
+* Explore real-world applications of splines, penalized regression, or PCA that was not covered in the class.
+
+* Extension of methods not covered in the class.
+    - sparse PCA
+    - generalized additive models
+    - etc.
+
+* Data visualization methods not covered in the class.
+    - Tableau
+    - etc.
+
+Share your overall thoughts, feelings, and reflections on what you’ve learned, appreciated, and areas where you see potential for personal improvement while working on Problem 3. 
+
+*In essence, aim to go above and beyond in your exploration!*
+
+## Solution
+
