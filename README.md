@@ -10,5 +10,4 @@ To run any application:
    ```bash
    cd app1  # Replace with the app folder name
 
-
 (final 첨부하기)
