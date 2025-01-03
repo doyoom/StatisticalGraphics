@@ -1,9 +1,3 @@
-Component => Selectize (Multiple)  Shiny - Selectize (Multiple)
-
-Layouts => Vertically collapsing accordion panels  Shiny - Tabs
-
-
-
 library(shiny)
 
 library(bslib)
