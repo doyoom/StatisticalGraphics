@@ -20,5 +20,4 @@ us_contagious_diseases 데이터셋을 사용하여 **전염병 데이터 시각
 특정 연도(예: 백신 도입 연도)를 시각적으로 강조하기 위해 geom_vline()을 사용해 수직선 표시를 합니다.
 
 
-링크 : file:///Users/kimdoyoon/Downloads/DV_HW_2_Students.html </br>
-
+링크 : file:///Users/kimdoyoon/Downloads/DV_HW_2_Students.html 
